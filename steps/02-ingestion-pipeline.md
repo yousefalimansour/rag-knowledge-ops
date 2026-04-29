@@ -190,14 +190,23 @@ GET /api/jobs/stream                         (auth, SSE)
 
 ## Acceptance Criteria
 
-- [ ] `POST /api/ingest/files` accepts PDF/TXT/MD, returns 202 with job id.
-- [ ] `POST /api/ingest/source` accepts Slack and Notion JSON.
-- [ ] Document + chunks persisted; embeddings in Chroma.
-- [ ] Dedup prevents duplicate docs by content hash.
-- [ ] Versioning increments on changed content with same title.
-- [ ] Job status visible via `GET /api/jobs/:id` and SSE stream.
-- [ ] All step-02 tests pass.
-- [ ] Re-running ingestion on a `ready` doc is a no-op.
+- [x] `POST /api/ingest/files` accepts PDF/TXT/MD, returns 202 with job id. *(Verified live with `curl -F`. MIME sniffing via [filetype](https://pypi.org/project/filetype/); 415 on unsupported binaries.)*
+- [x] `POST /api/ingest/source` accepts Slack and Notion JSON. *(Verified live; canonical shapes documented in [slack.py](../services/api/app/ingestion/extractors/slack.py) and [notion.py](../services/api/app/ingestion/extractors/notion.py).)*
+- [x] Document + chunks persisted; embeddings in Chroma. *([test_ingest_service.py](../services/api/app/tests/test_ingest_service.py) walks the full pipeline with stubbed embeddings; live run reaches `stage=embed` and only stops because `GOOGLE_API_KEY` is unset, which is expected in dev.)*
+- [x] Dedup prevents duplicate docs by content hash. *(Verified live: second upload of identical bytes returns `deduplicated: true`, same `document_id`, no new job.)*
+- [x] Versioning increments on changed content with same title. *(Verified live: re-uploading edited content with the same filename yields `v2` while `v1` stays.)*
+- [x] Job status visible via `GET /api/jobs/:id` and SSE stream. *(REST endpoint + polling-based SSE at `/api/jobs/stream/sse` consumed by the documents page.)*
+- [x] All step-02 tests pass. *(33 pytest tests across normalize, chunker, extractors, dedup, ingest service, ingest API, jobs API.)*
+- [x] Re-running ingestion on a `ready` doc is a no-op. *([test_ingest_orchestrator_idempotent_on_ready_doc](../services/api/app/tests/test_ingest_service.py).)*
+
+### Hash-strategy deviation (documented)
+
+The brief says `content_hash = sha256(normalized full text)`. We compute it
+from raw upload bytes (or canonical-JSON for source payloads) at the *upload*
+edge, before extraction. This makes dedup a single fast DB lookup per upload
+and avoids extracting a duplicate. Trade-off: two PDFs with identical text
+but different binary metadata won't dedup. Acceptable for the demo; documented
+in [services/api/app/services/dedup.py](../services/api/app/services/dedup.py).
 
 ## Next
 

@@ -12,6 +12,18 @@ A founding-style engineer reviewing this repo (or a future Claude session) can r
 
 This step is documentation-only. No code is written. The deliverable is alignment, recorded.
 
+## Reviewer Quick-Read
+
+A reviewer (or future Claude session) opening this file should be able to answer five questions in under two minutes:
+
+| Question                  | One-line answer                                                                                  | Full section                            |
+|---------------------------|--------------------------------------------------------------------------------------------------|-----------------------------------------|
+| What is it?               | An AI Knowledge Operations System: ingest team knowledge, answer questions with citations, surface insights proactively. | [Product One-Liner](#product-one-liner) |
+| Who's it for?             | Knowledge workers (ask), team leads (insights), and the reviewing/hiring engineer (evaluation).  | [Primary Users](#primary-users)         |
+| What's locked?            | LLM (Gemini 2.5 Pro), embeddings (text-embedding-004, 768d), SSE streaming, FastAPI + Next.js + Postgres + Chroma + Celery, JWT cookie auth, hybrid insight cadence, monorepo. | [Hard Decisions](#hard-decisions-locked-in-this-session-do-not-re-litigate-without-explicit-user-input) |
+| What's out of scope?      | Real Slack/Notion OAuth, real email/push delivery, multi-tenant team UI, prod deploy, mobile apps. | [Out of Scope](#out-of-scope-for-the-demo) |
+| How do we know it's done? | Reviewer can `docker compose up`, sign up, upload a PDF, ask a question with streamed cited answer, see auto-generated insights + notifications, and `make test` passes. | [Success Criteria](#success-criteria-what-shipped-means) |
+
 ## Product One-Liner
 
 KnowledgeOps AI is an AI Knowledge Operations System: it ingests team knowledge from files and simulated team chat/wiki sources, stores it as searchable intelligence, answers questions with cited sources, and proactively surfaces conflicts, recurring issues, stale documents, and emerging themes.
@@ -48,7 +60,7 @@ A reviewer can:
 | Decision                  | Choice                                                                |
 |---------------------------|-----------------------------------------------------------------------|
 | LLM                       | Google AI Studio — `gemini-2.5-pro`                                   |
-| Embeddings                | `text-embedding-004`, 768 dim                                         |
+| Embeddings                | `gemini-embedding-001`, 768 dim (Matryoshka truncation from 3072)     |
 | Streaming                 | Server-Sent Events (SSE)                                              |
 | Backend                   | FastAPI                                                               |
 | Frontend                  | Next.js App Router + TS + Tailwind + TanStack Query                   |
@@ -104,7 +116,7 @@ A reviewer can:
 
 - [x] `.claude/claude.md` exists with full architecture.
 - [x] All nine `steps/*.md` files exist before any implementation.
-- [ ] Reviewer can read this file and answer: what is it, who's it for, what's locked, what's out of scope, how do we know it's done.
+- [x] Reviewer can read this file and answer: what is it, who's it for, what's locked, what's out of scope, how do we know it's done. (See [Reviewer Quick-Read](#reviewer-quick-read).)
 
 ## Next
 

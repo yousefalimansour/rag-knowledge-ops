@@ -1,0 +1,17 @@
+{
+  "name": "knowledgeops-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KnowledgeOps AI — monorepo root.",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "web:dev": "pnpm --filter @kops/web dev",
+    "web:build": "pnpm --filter @kops/web build",
+    "web:lint": "pnpm --filter @kops/web lint",
+    "web:test": "pnpm --filter @kops/web test",
+    "web:e2e": "pnpm --filter @kops/web test:e2e"
+  }
+}

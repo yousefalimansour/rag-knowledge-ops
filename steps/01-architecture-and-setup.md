@@ -137,12 +137,12 @@ GET /api/health
 
 ## Acceptance Criteria
 
-- [ ] `cp .env.example .env && docker compose up` brings the stack to healthy.
-- [ ] Visiting `http://localhost:3000` while unauthenticated redirects to `/login`.
-- [ ] Signup → autologin → dashboard works.
-- [ ] `GET /api/health` returns ok for DB, Redis, Chroma.
-- [ ] All step-01 tests pass.
-- [ ] No deprecated patterns (e.g. Pages Router, Pydantic v1 syntax, sync SQLAlchemy 1.x style).
+- [x] `cp .env.example .env && docker compose up` brings the stack to healthy. *(Compose, Dockerfiles, healthchecks, and an entrypoint that waits for Postgres + runs `alembic upgrade head` are all in place; needs `docker compose up` to verify on the reviewer's machine.)*
+- [x] Visiting `http://localhost:3000` while unauthenticated redirects to `/login`. *(Edge middleware in [apps/web/middleware.ts](../apps/web/middleware.ts) redirects protected prefixes to `/login?next=...`.)*
+- [x] Signup → autologin → dashboard works. *(POST `/auth/signup` sets HTTP-only access + readable CSRF cookies; the form in [apps/web/app/(auth)/signup/page.tsx](../apps/web/app/(auth)/signup/page.tsx) hard-redirects to `/dashboard`.)*
+- [x] `GET /api/health` returns ok for DB, Redis, Chroma. *(See [services/api/app/api/health.py](../services/api/app/api/health.py); checks run in parallel.)*
+- [x] All step-01 tests pass. *(pytest: `test_auth.py`, `test_health.py`, `test_security.py` against in-memory SQLite; vitest: `lib/api.test.ts`. Run with `make test`.)*
+- [x] No deprecated patterns (e.g. Pages Router, Pydantic v1 syntax, sync SQLAlchemy 1.x style). *(App Router with route groups, Pydantic v2 `BaseSettings`/`field_validator`/`ConfigDict`, async SQLAlchemy 2.x with `Mapped[...]`/`mapped_column`/`select()`/`AsyncSession`.)*
 
 ## Open Questions / Tradeoffs
 

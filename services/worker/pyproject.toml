@@ -1,0 +1,19 @@
+[project]
+name = "kops-worker"
+version = "0.1.0"
+description = "KnowledgeOps AI — Celery worker + beat. Imports app.* from the api package."
+requires-python = ">=3.12"
+dependencies = [
+    "celery==5.4.0",
+    "redis==5.0.8",
+    "structlog==24.4.0",
+    "python-json-logger==2.0.7",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["worker*"]

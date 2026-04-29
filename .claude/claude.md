@@ -74,7 +74,7 @@
 | Vector store | Chroma (server mode)                            | Required by brief. Local-first, simple, persistent.                    |
 | Queue        | Redis 7 + Celery 5 + Celery Beat                | Required by brief. Mature, supports scheduled + on-demand jobs.        |
 | LLM          | Google AI Studio — `gemini-2.5-pro`             | User decision. Strong reasoning, native streaming.                     |
-| Embeddings   | Google `text-embedding-004` (768d)              | User decision. Matches Chroma collection dim.                          |
+| Embeddings   | Google `gemini-embedding-001` (3072d native, truncated to 768d via `output_dimensionality`) | Active embedding model on the user's API key; 768-dim Matryoshka truncation keeps Chroma collection compat. |
 | Auth         | FastAPI-Users or hand-rolled JWT (HTTP-only cookie) | Real login, protected frontend + backend routes.                       |
 | Streaming    | Server-Sent Events (SSE)                        | User decision. Simpler than WS for one-way streaming.                  |
 | Testing      | pytest + httpx + Playwright (frontend) + custom retrieval-quality script | Backend, integration, E2E, RAG eval.    |
@@ -163,6 +163,24 @@ rag-knowledge-ops/
 
 ## 7. Frontend Responsibilities (`apps/web`)
 
+### 7.1 Visual design language (locked)
+
+- **Theme:** dark glass-morphism. Source aesthetic: Uiverse `Priyanshu02020` login card. Auth screens render that card verbatim (animated conic-gradient halo, inset highlight shadows, neumorphic logo). Every other screen uses the same palette + shadow tokens via Tailwind theme.
+- **Palette tokens** (defined in `apps/web/tailwind.config.ts`):
+  - `bg-surface-900` `#1a1a1a` — page background
+  - `bg-surface-800` `#222222` — card / panel resting
+  - `bg-surface-700` `#272727` — elevated card / login-box
+  - `bg-surface-600` `#2f2f2f` — hover / focus lift
+  - `bg-control` `#373737` — buttons; `bg-control-input` `#3a3a3a` — inputs
+  - `text-ink` `#fff` / `text-ink-muted` `rgba(255,255,255,0.7)` / `text-ink-subtle` `rgba(255,255,255,0.5)` / `border-ink-faint` `rgba(255,255,255,0.12)`
+  - `accent` `#7c8cff` — used sparingly for active state, focus rings, links
+  - `shadow-card`, `shadow-inset`, `shadow-button` — match Uiverse outer/inset combos
+- **Auth screens use a CSS Module** (`apps/web/app/(auth)/auth.module.css`) for the verbatim card + animated halo. Don't migrate this to Tailwind utilities — the conic-gradient and pseudo-element logo lose fidelity.
+- **No light mode** for this project.
+- **No marketing landing page.** Entry post-login is the dashboard.
+
+### 7.2 Behavior
+
 - Auth flows (login, signup, logout, session refresh) with protected route groups.
 - Dashboard, Documents list, Upload, Knowledge Search, AI Copilot (chat), Insights, Notifications, Settings.
 - TanStack Query for all server state. SWR-style optimistic updates for mutations.
@@ -233,7 +251,7 @@ SECRET_KEY=...
 DATABASE_URL=postgresql+asyncpg://kops:kops@db:5432/kops
 REDIS_URL=redis://cache:6379/0
 CHROMA_URL=http://vector:8000
-CORS_ORIGINS=http://localhost:3000
+CORS_ORIGINS=http://localhost:7000
 
 # auth
 JWT_SECRET=...
@@ -246,7 +264,7 @@ COOKIE_DOMAIN=
 # google ai studio
 GOOGLE_API_KEY=...
 GEMINI_MODEL=gemini-2.5-pro
-EMBEDDING_MODEL=text-embedding-004
+EMBEDDING_MODEL=gemini-embedding-001
 EMBEDDING_DIM=768
 
 # limits
@@ -258,8 +276,9 @@ QUERY_RATE_LIMIT_PER_MIN=20
 INSIGHT_COORDINATOR_CRON=*/30 * * * *
 INSIGHT_NIGHTLY_AUDIT_CRON=0 3 * * *
 
-# web
-NEXT_PUBLIC_API_URL=http://localhost:8000
+# web — for `next dev` on the host. Inside the web container, docker-compose
+# hard-overrides this to http://api:8000 so the rewrite uses container DNS.
+NEXT_PUBLIC_API_URL=http://localhost:8090
 ```
 
 ## 12. Local Development Commands
@@ -272,9 +291,10 @@ docker compose build
 # run everything
 docker compose up
 
-# urls
-# web:    http://localhost:3000
-# api:    http://localhost:8000/docs
+# urls — host ports are 5000 (web) and 8090 (api). Container-internal stays
+# 8000 for the api so service-to-service DNS does not need to know the host port.
+# web:    http://localhost:7000
+# api:    http://localhost:8090/docs
 # chroma: http://localhost:8001
 # db:     postgres://kops:kops@localhost:5432/kops
 

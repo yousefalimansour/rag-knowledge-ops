@@ -170,13 +170,13 @@ docker compose up
 docker compose exec api python -m app.scripts.seed
 
 # 4. open the app
-open http://localhost:3000
+open http://localhost:7000
 ```
 
 | Service            | URL / Port                    |
 |--------------------|-------------------------------|
-| 🌐 Web             | http://localhost:3000         |
-| ⚡ API + OpenAPI   | http://localhost:8000/docs    |
+| 🌐 Web             | http://localhost:7000         |
+| ⚡ API + OpenAPI   | http://localhost:8090/docs    |
 | 🔍 Chroma          | http://localhost:8001         |
 | 🐘 Postgres        | `postgres://kops:kops@localhost:5432/kops` |
 | ⚡ Redis           | `redis://localhost:6379`      |
@@ -428,12 +428,12 @@ rag-knowledge-ops/
 │   └── web/                    # Next.js App Router (auth + app route groups)
 ├── services/
 │   ├── api/                    # FastAPI: routers, models, services, AI, retrieval
+│   │   └── migrations/         # Alembic — co-located with models
 │   └── worker/                 # Celery worker + Beat schedule
 ├── packages/
-│   └── shared-types/           # OpenAPI-generated TS types
+│   └── shared-types/           # OpenAPI-generated TS types (later steps)
 ├── infra/
-│   ├── docker/                 # Dockerfiles per service
-│   └── migrations/             # Alembic
+│   └── docker/                 # Dockerfiles per service
 ├── eval/
 │   └── retrieval/              # ~15 Q&A pairs + pytest harness
 ├── seed/                       # demo PDFs / MD / Slack / Notion JSON
@@ -450,10 +450,11 @@ rag-knowledge-ops/
 ## 🧪 Testing & Evaluation
 
 ```bash
-make test        # unit + integration + worker + frontend-unit
-make e2e         # Playwright happy path
-make eval        # RAG retrieval-quality on ~15 Q&A pairs
-make lint        # ruff + mypy + eslint + tsc
+make test        # backend (pytest) + frontend (vitest)
+make test-api    # backend only
+make test-web    # frontend unit (vitest); use `pnpm --filter @kops/web test:e2e` for Playwright
+make test-eval   # RAG retrieval-quality on ~15 Q&A pairs (lands in step 07)
+make lint        # ruff + eslint
 ```
 
 The **retrieval evaluation harness** lives at [`eval/retrieval/`](eval/retrieval) — a focused fixture corpus (including a *designed* conflict pair), a `questions.yaml` of ~15 Q&A pairs with expected source documents and required-refusal cases, and metrics:
