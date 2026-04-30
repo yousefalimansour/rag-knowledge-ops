@@ -1,0 +1,30 @@
+{
+  "channel": "support",
+  "messages": [
+    {
+      "ts": "2026-02-01T09:14:00Z",
+      "user": "@dana",
+      "text": "Customer Acme reporting CSV import truncates rows past 50,000. We're seeing this for the third time this month."
+    },
+    {
+      "ts": "2026-02-01T09:18:00Z",
+      "user": "@morgan",
+      "text": "Yep, same as the issue Foo Corp raised on 2026-01-19 and Bar Industries on 2026-01-26. Looks like a recurring CSV import row-cap problem."
+    },
+    {
+      "ts": "2026-02-08T14:02:00Z",
+      "user": "@taylor",
+      "text": "Yet another CSV import truncation report (this is the fourth in 6 weeks). Filed bug ENG-1421 to track the row cap."
+    },
+    {
+      "ts": "2026-02-15T11:30:00Z",
+      "user": "@dana",
+      "text": "SSO outage with Okta from 09:42–10:11 UTC. Root cause: expired SAML cert; rotation runbook lives in the security handbook."
+    },
+    {
+      "ts": "2026-03-02T08:50:00Z",
+      "user": "@morgan",
+      "text": "Quick reminder for new responders: SSO certs rotate every 6 months and the next rotation is due 2026-08-15."
+    }
+  ]
+}

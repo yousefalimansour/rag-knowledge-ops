@@ -1,0 +1,53 @@
+{
+  "page_title": "Engineering Onboarding",
+  "blocks": [
+    {
+      "type": "heading_1",
+      "text": "Welcome to Engineering"
+    },
+    {
+      "type": "paragraph",
+      "text": "This page is the canonical onboarding checklist. New engineers should complete every section in order during their first two weeks."
+    },
+    {
+      "type": "heading_2",
+      "text": "Day 1 — accounts and access"
+    },
+    {
+      "type": "bulleted_list_item",
+      "text": "Receive your laptop from IT and complete the FileVault setup."
+    },
+    {
+      "type": "bulleted_list_item",
+      "text": "Sign in to Google Workspace, Slack, GitHub, and 1Password using your @example.com email."
+    },
+    {
+      "type": "bulleted_list_item",
+      "text": "Request access to the engineering-prod 1Password vault from your manager."
+    },
+    {
+      "type": "heading_2",
+      "text": "Week 1 — environment setup"
+    },
+    {
+      "type": "bulleted_list_item",
+      "text": "Clone the rag-knowledge-ops monorepo. Run `docker compose up` to bring up the full stack locally."
+    },
+    {
+      "type": "bulleted_list_item",
+      "text": "Run the seed script via `make seed` to populate demo data, then sign in at http://localhost:7000 with the demo credentials printed by the script."
+    },
+    {
+      "type": "heading_2",
+      "text": "Week 2 — first contribution"
+    },
+    {
+      "type": "bulleted_list_item",
+      "text": "Pick a `good-first-issue` ticket from the engineering board, open a PR, and pair with the on-call engineer for review."
+    },
+    {
+      "type": "bulleted_list_item",
+      "text": "Attend the Friday architecture review."
+    }
+  ]
+}

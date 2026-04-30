@@ -129,14 +129,28 @@ Volumes: `pgdata`, `chroma_data`, `redis_data`. Networks: a single bridge networ
 
 ## Acceptance Criteria
 
-- [ ] One command (`docker compose up`) runs the whole stack to healthy.
-- [ ] `.env.example` documents every required and optional variable.
-- [ ] Logs are JSON, structured, with request/correlation IDs propagating to workers.
-- [ ] Errors return RFC 7807 problem details consistently.
-- [ ] Rate limiting and caching are observable and tunable via env.
-- [ ] Migrations run automatically on api startup; a fresh DB ends up at the latest schema.
-- [ ] `make seed` produces a fully usable demo state.
-- [ ] No secrets in logs, repo, or images.
+- [x] One command (`docker compose up`) runs the whole stack to healthy. *(All seven services come up healthy; depends_on with `service_healthy` keeps the start order correct; `restart: unless-stopped` on every service.)*
+- [x] `.env.example` documents every required and optional variable. *([.env.example](../.env.example) carries one comment per var explaining purpose, default, and prod gotchas.)*
+- [x] Logs are JSON, structured, with request/correlation IDs propagating to workers. *(Live test: header `X-Request-ID: trace-1777516082776` → same id appears in api logs AND worker logs for the resulting ingest task. Implementation: [services/api/app/core/publisher.py](../services/api/app/core/publisher.py) attaches `request_id` to the Celery message headers; [services/worker/worker/context.py](../services/worker/worker/context.py) reads it on `task_prerun`.)*
+- [x] Errors return RFC 7807 problem details consistently. *(In place since step 01; [services/api/app/core/errors.py](../services/api/app/core/errors.py) installs handlers for `DomainError`, `HTTPException`, `RequestValidationError`, and a fallthrough.)*
+- [x] Rate limiting and caching are observable and tunable via env. *(Limits are env-controlled — `RATE_LIMIT_PER_MIN`, `QUERY_RATE_LIMIT_PER_MIN`, `LOGIN_RATE_LIMIT_PER_15MIN`. New [services/api/app/core/cache.py](../services/api/app/core/cache.py) gives `get_or_set` + workspace-scoped key helpers; query cache + embedding cache already use it.)*
+- [x] Migrations run automatically on api startup; a fresh DB ends up at the latest schema. *(api Dockerfile entrypoint runs `python -m app.scripts.wait_for_db && alembic upgrade head` before uvicorn; live confirms head = `0003_insights`.)*
+- [x] `make seed` produces a fully usable demo state. *(Live: 5 fixtures queued — `policies-old.md`, `policies-new.md`, `security-handbook.md`, Slack pricing thread JSON, Notion onboarding JSON. All reach `status=ready`. Login as `demo@example.com / demo-pass-1234` works on a re-seed.)*
+- [x] No secrets in logs, repo, or images. *([Settings.safe_dump()](../services/api/app/core/config.py) replaces secret-bearing fields with `***`; `repr(Settings)` redacts; `.env` is gitignored; api/worker images run as non-root uid 10001; `/docs` and `/openapi.json` are hidden when `APP_ENV=production`.)*
+
+### Notable hardening details
+
+- **Production fail-fast**: `Settings` raises on boot if `APP_ENV=production` and any of `SECRET_KEY` / `JWT_SECRET` / `GOOGLE_API_KEY` is empty or still a placeholder.
+- **Request-ID propagation**: api edge sets `request_id` from `X-Request-ID` (or generates one), echoes it back on the response, AND attaches it to every Celery message. Worker reads it on `task_prerun` and pushes into the same contextvar; all worker log lines under that task carry the value.
+- **JSON logging in worker**: Celery defaults to plain-text logs; we connect to the `setup_logging` signal so Celery skips its default and our `python-json-logger` formatter wins.
+- **Non-root runtime**: api + worker images use `uid=gid=10001` so the shared `uploads_data` named volume is writable from both. The volume is recreated when permissions change (one-time cost).
+- **`/docs` gating**: `docs_url` and `openapi_url` are `None` when `is_production`, so prod doesn't leak the endpoint surface to anonymous probes.
+
+### Caught during validation
+
+- The first `docker compose exec api python -m app.scripts.seed` failed with `PermissionError` on `/srv/uploads/...` because the `uploads_data` volume had been created with root ownership before the non-root user was added. Fix: `docker volume rm rag-knowledge-ops_uploads_data` once, then recreate. The named volume is now owned by uid 10001 and survives container recycles.
+- `demo@kops.local` was rejected by `email-validator` (`.local` is RFC 6762 reserved). Switched the seed default to `demo@example.com` (RFC 2606 reserved-for-docs).
+- Worker logs were initially Celery's plain-text format because `worker_process_init` runs *after* Celery's default logger setup. Switched to the `setup_logging` signal which suppresses Celery's defaults entirely.
 
 ## Next
 

@@ -1,4 +1,5 @@
 from app.models.document import Chunk, Document, EmbeddingCache, IngestJob
+from app.models.insight import Insight, InsightRun, Notification
 from app.models.user import User
 from app.models.workspace import UserWorkspace, Workspace
 
@@ -10,4 +11,7 @@ __all__ = [
     "Chunk",
     "IngestJob",
     "EmbeddingCache",
+    "Insight",
+    "InsightRun",
+    "Notification",
 ]

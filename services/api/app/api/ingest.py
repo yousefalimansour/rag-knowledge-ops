@@ -32,25 +32,14 @@ def _ingest_limiter() -> RateLimit:
     )
 
 
-_celery_publisher: object | None = None
-
-
 def _enqueue(job_id: UUID) -> None:
-    """Publish the ingest task to Redis. The api container does not import the
-    worker package — it talks to the broker directly using the same Celery
-    task name the worker registers under.
+    """Publish the ingest task to Redis. The api container does not import
+    the worker package — `app.core.publisher.publish` attaches the current
+    request_id to the message headers so worker logs can be correlated.
     """
-    global _celery_publisher
-    if _celery_publisher is None:
-        from celery import Celery
+    from app.core.publisher import publish
 
-        settings = get_settings()
-        _celery_publisher = Celery(
-            "kops-publisher",
-            broker=settings.REDIS_URL,
-            backend=settings.REDIS_URL,
-        )
-    _celery_publisher.send_task("worker.tasks.ingest.run", args=[str(job_id)])  # type: ignore[attr-defined]
+    publish("worker.tasks.ingest.run", str(job_id))
 
 
 def _ingest_dispatcher() -> object:

@@ -1,0 +1,113 @@
+# Retrieval-quality eval set.
+#
+# `expected_doc_ids` are LOGICAL ids — the conftest fixture maps them to the
+# actual workspace document UUIDs at runtime via the title→id table. Use the
+# stem of the corpus file (no extension) as the logical id.
+#
+# `must_refuse: true` means the question is deliberately out-of-corpus and
+# the system MUST return the refusal text + zero sources.
+
+- id: q1
+  question: "What is the maximum enterprise discount under the current pricing policy?"
+  expected_doc_ids: ["pricing-policy-v2"]
+  expected_phrases: ["25%"]
+  category: "factual"
+  must_refuse: false
+
+- id: q2
+  question: "How long does the pilot program run?"
+  expected_doc_ids: ["pricing-policy-v2"]
+  expected_phrases: ["30 days"]
+  category: "factual"
+  must_refuse: false
+
+- id: q3
+  question: "What's the seat minimum on the Starter plan?"
+  expected_doc_ids: ["pricing-policy-v2"]
+  expected_phrases: ["3"]
+  category: "factual"
+  must_refuse: false
+
+- id: q4
+  question: "Why did we drop the in-product wiki feature?"
+  expected_doc_ids: ["product-decisions"]
+  expected_phrases: ["engagement", "Notion"]
+  category: "factual"
+  must_refuse: false
+
+- id: q5
+  question: "When did we decide to sunset the on-premise installer, and why?"
+  expected_doc_ids: ["product-decisions"]
+  expected_phrases: ["2025-05-19", "maintenance"]
+  category: "factual"
+  must_refuse: false
+
+- id: q6
+  question: "Which embedding model are we using and why was it picked?"
+  expected_doc_ids: ["product-decisions"]
+  expected_phrases: ["gemini-embedding-001", "768"]
+  category: "factual"
+  must_refuse: false
+
+- id: q7
+  question: "How are user passwords stored?"
+  expected_doc_ids: ["security-handbook"]
+  expected_phrases: ["Argon2id"]
+  category: "factual"
+  must_refuse: false
+
+- id: q8
+  question: "How often do SAML signing certificates rotate, and when is the next rotation due?"
+  expected_doc_ids: ["security-handbook"]
+  expected_phrases: ["6 months", "2026-08-15"]
+  category: "factual"
+  must_refuse: false
+
+- id: q9
+  question: "What recurring customer issue have we seen with CSV imports recently?"
+  expected_doc_ids: ["support-logs"]
+  expected_phrases: ["CSV", "50,000"]
+  category: "recurring-issue"
+  must_refuse: false
+
+- id: q10
+  question: "What should a new engineer do during their first week?"
+  expected_doc_ids: ["onboarding.notion"]
+  expected_phrases: ["docker compose"]
+  category: "factual"
+  must_refuse: false
+
+- id: q11
+  question: "What is the seat minimum on the Business plan?"
+  expected_doc_ids: ["pricing-policy-v2"]
+  expected_phrases: ["25"]
+  category: "factual"
+  must_refuse: false
+
+- id: q12
+  question: "Where do external researchers report security vulnerabilities?"
+  expected_doc_ids: ["security-handbook"]
+  expected_phrases: ["security@example.com"]
+  category: "factual"
+  must_refuse: false
+
+- id: q13
+  question: "What's our annual revenue from the EMEA region?"
+  expected_doc_ids: []
+  expected_phrases: []
+  category: "out-of-corpus"
+  must_refuse: true
+
+- id: q14
+  question: "What's our policy on open-source licenses for outside contributors?"
+  expected_doc_ids: []
+  expected_phrases: []
+  category: "out-of-corpus"
+  must_refuse: true
+
+- id: q15
+  question: "Who is the CEO of Anthropic?"
+  expected_doc_ids: []
+  expected_phrases: []
+  category: "out-of-corpus"
+  must_refuse: true

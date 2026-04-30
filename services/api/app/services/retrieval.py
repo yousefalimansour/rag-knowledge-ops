@@ -6,7 +6,6 @@ Returns a flat list of `RetrievalCandidate` ready for the reasoning step
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from uuid import UUID
 
@@ -29,6 +28,7 @@ async def retrieve(
     question: str,
     filters: RetrievalFilters | None = None,
     use_query_rewrite: bool = True,
+    use_rerank: bool = True,
     candidate_pool: int = 20,
     top_k: int = 8,
 ) -> tuple[list[RetrievalCandidate], dict]:
@@ -44,22 +44,23 @@ async def retrieve(
     if not queries:
         return [], {"rewrites": [], "vector_hits": 0, "keyword_hits": 0, "fused": 0, "reranked": 0, "rerank_fallback": False}
 
-    # Run vector + keyword in parallel for each query, then fuse all of them.
-    coros = []
+    # Run searches sequentially on the shared session — async SQLAlchemy
+    # forbids concurrent ops on a single session, and the DB calls are tiny
+    # next to the LLM calls that dominate request latency.
+    results: list[list] = []
     for q in queries:
-        coros.append(
-            vs.vector_search(
+        results.append(
+            await vs.vector_search(
                 session=session, workspace_id=workspace_id, query=q,
                 top_k=candidate_pool, filters=filters,
             )
         )
-        coros.append(
-            kw.keyword_search(
+        results.append(
+            await kw.keyword_search(
                 session=session, workspace_id=workspace_id, query=q,
                 top_k=candidate_pool, filters=filters,
             )
         )
-    results = await asyncio.gather(*coros, return_exceptions=False)
 
     vector_hits = sum(len(r) for r in results[::2])
     keyword_hits = sum(len(r) for r in results[1::2])
@@ -71,7 +72,10 @@ async def retrieve(
             "fused": 0, "reranked": 0, "rerank_fallback": False,
         }
 
-    reranked, used_llm = rerank(question, fused, top_k_in=candidate_pool, top_k_out=top_k)
+    if use_rerank:
+        reranked, used_llm = rerank(question, fused, top_k_in=candidate_pool, top_k_out=top_k)
+    else:
+        reranked, used_llm = fused[:top_k], False
 
     log.info(
         "retrieval.done",

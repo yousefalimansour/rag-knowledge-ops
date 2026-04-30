@@ -31,7 +31,12 @@ celery_app = Celery(
     "kops",
     broker=_settings.REDIS_URL,
     backend=_settings.REDIS_URL,
-    include=["worker.tasks.ping", "worker.tasks.ingest"],
+    include=[
+        "worker.context",  # signal handlers — must be imported so they register
+        "worker.tasks.ping",
+        "worker.tasks.ingest",
+        "worker.tasks.insights",
+    ],
 )
 
 celery_app.conf.update(
@@ -47,14 +52,14 @@ celery_app.conf.update(
     task_track_started=True,
 )
 
-# Beat schedules — tasks themselves are stubs until step 05.
+# Beat schedules — both cadences run real generators (step 05).
 celery_app.conf.beat_schedule = {
     "insight-coordinator-30m": {
-        "task": "worker.tasks.ping.coordinator_stub",
+        "task": "worker.tasks.insights.coordinator",
         "schedule": _crontab_from_str(_settings.INSIGHT_COORDINATOR_CRON),
     },
     "insight-nightly-audit": {
-        "task": "worker.tasks.ping.nightly_audit_stub",
+        "task": "worker.tasks.insights.nightly",
         "schedule": _crontab_from_str(_settings.INSIGHT_NIGHTLY_AUDIT_CRON),
     },
 }
@@ -62,4 +67,4 @@ celery_app.conf.beat_schedule = {
 
 @celery_app.on_after_configure.connect
 def _on_configure(sender, **_kwargs):  # noqa: ARG001
-    configure_logging("INFO")
+    configure_logging("INFO", service="worker")

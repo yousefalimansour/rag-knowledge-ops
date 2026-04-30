@@ -15,8 +15,8 @@ x-api-env: &api_env
   COOKIE_SECURE: ${COOKIE_SECURE:-false}
   COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
   GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-pro}
-  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-004}
+  GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-gemini-embedding-001}
   EMBEDDING_DIM: ${EMBEDDING_DIM:-768}
   MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-25}
   RATE_LIMIT_PER_MIN: ${RATE_LIMIT_PER_MIN:-60}
@@ -28,6 +28,7 @@ x-api-env: &api_env
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: kops
       POSTGRES_PASSWORD: kops
@@ -44,6 +45,7 @@ services:
 
   cache:
     image: redis:7-alpine
+    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redisdata:/data
@@ -57,6 +59,7 @@ services:
 
   vector:
     image: chromadb/chroma:0.5.23
+    restart: unless-stopped
     environment:
       IS_PERSISTENT: "TRUE"
       ANONYMIZED_TELEMETRY: "FALSE"
@@ -74,10 +77,12 @@ services:
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
+    restart: unless-stopped
     environment:
       <<: *api_env
     volumes:
       - ./services/api:/srv/api
+      - ./eval:/srv/eval
       - uploads_data:/srv/uploads
     ports:
       - "8090:8000"
@@ -98,6 +103,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/worker.Dockerfile
+    restart: unless-stopped
     environment:
       <<: *api_env
     volumes:
@@ -113,6 +119,7 @@ services:
     build:
       context: .
       dockerfile: infra/docker/worker.Dockerfile
+    restart: unless-stopped
     environment:
       <<: *api_env
     volumes:
@@ -129,6 +136,7 @@ services:
       context: .
       dockerfile: infra/docker/web.Dockerfile
       target: dev
+    restart: unless-stopped
     environment:
       # Inside the web container, the rewrite target must use container DNS,
       # not the host port. Hard-coded so it does not get overridden by .env.

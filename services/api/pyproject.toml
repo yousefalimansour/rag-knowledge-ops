@@ -35,6 +35,7 @@ dev = [
     "ruff==0.6.9",
     "mypy==1.11.2",
     "aiosqlite==0.20.0",
+    "pyyaml==6.0.2",
 ]
 
 [tool.ruff]
@@ -54,6 +55,12 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["app/tests"]
 addopts = "-q --tb=short"
+markers = [
+    "unit: fast, no-I/O unit tests (default)",
+    "integration: tests that hit the in-memory DB through FastAPI",
+    "worker: tests that exercise Celery task code paths",
+    "eval: retrieval-quality harness; needs GOOGLE_API_KEY + Chroma + Postgres",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

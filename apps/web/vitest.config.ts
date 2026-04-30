@@ -13,5 +13,6 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['**/*.test.ts', '**/*.test.tsx'],
     exclude: ['node_modules', 'e2e', '.next'],
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

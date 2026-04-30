@@ -68,6 +68,20 @@ async def ingest_document(*, session: AsyncSession, job_id: UUID) -> dict:
             "ingest.complete",
             extra={"document_id": str(doc.id), "chunks": len(chunks_payload)},
         )
+
+        # Post-ingest hook: notify users + enqueue scoped insight generation.
+        from app.notifications.dispatcher import notify_ingest_completed
+
+        await notify_ingest_completed(
+            session=session,
+            workspace_id=doc.workspace_id,
+            document_id=doc.id,
+            document_title=doc.title,
+            chunk_count=doc.chunk_count,
+        )
+        await session.commit()
+        _enqueue_scoped_insights(workspace_id=doc.workspace_id, doc_id=doc.id)
+
         return {"status": "ready", "chunks_indexed": len(chunks_payload), "deduplicated": False}
 
     except Exception as e:  # noqa: BLE001
@@ -78,7 +92,36 @@ async def ingest_document(*, session: AsyncSession, job_id: UUID) -> dict:
         doc.status = "failed"
         doc.error = str(e)[:2000]
         await session.commit()
+
+        # Best-effort failure notification.
+        try:
+            from app.notifications.dispatcher import notify_ingest_completed
+
+            await notify_ingest_completed(
+                session=session,
+                workspace_id=doc.workspace_id,
+                document_id=doc.id,
+                document_title=doc.title,
+                chunk_count=0,
+                failed=True,
+                error=str(e)[:200],
+            )
+            await session.commit()
+        except Exception:  # noqa: BLE001
+            log.warning("notify.ingest_failed_dispatch_failed")
         raise
+
+
+def _enqueue_scoped_insights(*, workspace_id, doc_id) -> None:
+    """Publish the scoped-insight task. Goes through `core.publisher.publish`
+    so the api request_id is propagated to the worker."""
+    from app.core.publisher import publish
+
+    publish(
+        "worker.tasks.insights.scoped",
+        str(workspace_id),
+        [str(doc_id)],
+    )
 
 
 async def _extract_for(

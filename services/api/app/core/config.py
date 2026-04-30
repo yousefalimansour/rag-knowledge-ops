@@ -1,7 +1,32 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Fields whose values must NEVER appear in logs / repr / health output.
+_SECRET_FIELDS = frozenset(
+    {
+        "SECRET_KEY",
+        "JWT_SECRET",
+        "GOOGLE_API_KEY",
+        "DATABASE_URL",  # contains password
+        "REDIS_URL",  # may contain password
+    }
+)
+
+# Required-in-production fields. Boot fails fast if any of these are unset
+# OR still hold a placeholder value. In dev we allow placeholders so the demo
+# can boot before the user adds a real GOOGLE_API_KEY.
+_PROD_REQUIRED = ("SECRET_KEY", "JWT_SECRET", "GOOGLE_API_KEY")
+_PLACEHOLDERS = frozenset(
+    {
+        "",
+        "change-me",
+        "change-me-jwt",
+        "change-me-in-prod-please",
+        "change-me-jwt-secret-please",
+    }
+)
 
 
 class Settings(BaseSettings):
@@ -30,8 +55,8 @@ class Settings(BaseSettings):
     COOKIE_DOMAIN: str | None = None
 
     GOOGLE_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-pro"
-    EMBEDDING_MODEL: str = "text-embedding-004"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    EMBEDDING_MODEL: str = "gemini-embedding-001"
     EMBEDDING_DIM: int = 768
 
     MAX_UPLOAD_MB: int = 25
@@ -56,6 +81,22 @@ class Settings(BaseSettings):
             return None
         return v
 
+    @model_validator(mode="after")
+    def _enforce_required_in_prod(self) -> "Settings":
+        """Fail fast in production if any required secret is still a placeholder."""
+        if self.APP_ENV == "production":
+            missing = [
+                field
+                for field in _PROD_REQUIRED
+                if str(getattr(self, field, "")).strip() in _PLACEHOLDERS
+            ]
+            if missing:
+                raise ValueError(
+                    f"APP_ENV=production but these required env vars are unset or placeholder: "
+                    f"{', '.join(missing)}"
+                )
+        return self
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
@@ -63,6 +104,21 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV == "production"
+
+    def safe_dump(self) -> dict[str, object]:
+        """Dump for logs / health — secret-bearing fields are replaced with '***'."""
+        out: dict[str, object] = {}
+        for name in self.model_fields:
+            v = getattr(self, name)
+            out[name] = "***" if name in _SECRET_FIELDS and v else v
+        return out
+
+    def __repr__(self) -> str:
+        parts = [f"{k}={v!r}" for k, v in self.safe_dump().items()]
+        return f"Settings({', '.join(parts)})"
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 @lru_cache(maxsize=1)

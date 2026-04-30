@@ -194,14 +194,37 @@ POST /api/notifications/mark-all-read         (auth)
 
 ## Acceptance Criteria
 
-- [ ] Post-ingest scoped insight task fires automatically after each successful ingestion.
-- [ ] Coordinator runs every 30 min and only processes deltas.
-- [ ] Nightly audit runs and produces cross-document insights on the seeded corpus.
-- [ ] `POST /api/insights/run` triggers a manual run; status visible in `/api/insights/runs`.
-- [ ] Insights deduplicated via `dedup_hash` — re-running produces no duplicates.
-- [ ] Each insight links to evidence chunks; clicking from UI opens the source preview.
-- [ ] Notifications persist, show unread count, can be marked read.
-- [ ] Bell UI receives a real notification when a new high-severity insight is created.
+- [x] Post-ingest scoped insight task fires automatically after each successful ingestion. *(Wired in [services/api/app/services/ingest.py](../services/api/app/services/ingest.py#L70-L99) — publishes `worker.tasks.insights.scoped` after the doc is `ready`. Validated live: t+2s and t+4s scoped runs visible in `/api/insights/runs`.)*
+- [x] Coordinator runs every 30 min and only processes deltas. *([services/api/app/insights/coordinator.py](../services/api/app/insights/coordinator.py) reads `watermark_after` from the previous successful run and only enqueues docs with `updated_at > watermark`. Beat schedule wired in [services/worker/worker/celery_app.py](../services/worker/worker/celery_app.py).)*
+- [x] Nightly audit runs and produces cross-document insights on the seeded corpus. *([services/api/app/insights/nightly.py](../services/api/app/insights/nightly.py) batches recent chunks for conflict + repeated-decision detection, and runs the deterministic stale-document scan. Beat-scheduled at 03:00 UTC.)*
+- [x] `POST /api/insights/run` triggers a manual run; status visible in `/api/insights/runs`. *(Run row created `queued` immediately for visibility, then Celery picks it up.)*
+- [x] Insights deduplicated via `dedup_hash` — re-running produces no duplicates. *(Unique index + race-safe IntegrityError fallback in [services/api/app/insights/repo.py](../services/api/app/insights/repo.py); proven by [test_save_insight_with_existing_dedup_hash_skips](../services/api/app/tests/test_insights_repo.py).)*
+- [x] Each insight links to evidence chunks; clicking from UI opens the source preview. *(Frontend cards in [apps/web/app/(app)/insights/page.tsx](../apps/web/app/(app)/insights/page.tsx) render evidence as chips that link to `/documents/:id`. Step 04's `<SourcePreviewSheet>` is reused via the existing chunk_id → preview pathway.)*
+- [x] Notifications persist, show unread count, can be marked read. *(Postgres-backed `notifications` table + endpoints; live test showed `unread_count=3` after one ingest cycle.)*
+- [x] Bell UI receives a real notification when a new high-severity insight is created. *(`notify_insight_created` fans out to all workspace members for severity ≥ medium. Topbar `<NotificationsBell>` polls every 30s + refetches on focus; verified live.)*
+
+### Live evidence
+
+```
+ingest leave_v1.txt (1.5 days/mo, 10-day cap)  → 202 doc 1d15...93a
+ingest leave_v2.txt (2.5 days/mo, 30-day cap)  → 202 doc 7de8...16f
+t+2s   scoped run #1 (doc 1)
+t+4s   scoped run #2 (doc 2, with doc 1 as peer)
+t+8s   /api/insights → 1 insight, type=conflict, severity=high
+        title: "Conflicting Vacation Accrual and Carry-over Policies"
+        evidence: chunks from BOTH docs (≥2 distinct documents — passes generator guard)
+       /api/notifications → unread_count=3
+        [high]  insight_created: Conflicting Vacation Accrual and Carry-over Policies
+        [info]  ingest_completed: Document ready: leave v2
+        [info]  ingest_completed: Document ready: leave v1
+```
+
+### Pragmatic deferrals
+
+- **HDBSCAN/KMeans clustering for nightly** — replaced with document-boundary batches (cap 60 chunks/workspace, batches of 18). Adequate for a small-corpus demo and avoids dragging in `scikit-learn` + `numpy.spatial`. The interface is small enough that swapping in proper clustering is a one-file change in [nightly.py](../services/api/app/insights/nightly.py) when needed.
+- **`frequent_issue` / `emerging_theme` / `missing_context`** types — these need a query log we don't yet capture, plus more corpus volume than the demo has. Schema room is left for them; ship in step 06 if useful.
+- **Notification digest collapsing** when an audit produces > N insights — out of scope for the demo's small corpus; current per-insight fan-out is fine and visible.
+- **Workspace-owner gate on `/api/insights/run`** — currently any authenticated workspace member can trigger. Owner-only enforcement lands when team management UI does (deferred under step 00 out-of-scope).
 
 ## Next
 

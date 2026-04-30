@@ -1,0 +1,27 @@
+{
+  "channel": "pricing",
+  "messages": [
+    {
+      "user": "alex",
+      "ts": "1717084800.000100",
+      "text": "Quick decision needed: do we keep the enterprise tier at $25k/year or bump to $30k? Sales is asking."
+    },
+    {
+      "user": "morgan",
+      "ts": "1717084900.000000",
+      "thread_ts": "1717084800.000100",
+      "text": "Last quarter's churn data argues for $25k. We bumped before and saw 8% drop in renewals."
+    },
+    {
+      "user": "alex",
+      "ts": "1717085200.000000",
+      "thread_ts": "1717084800.000100",
+      "text": "Good point. Let's lock enterprise at $25k for now. Revisit at end of Q2."
+    },
+    {
+      "user": "alex",
+      "ts": "1717171200.000000",
+      "text": "Decision recap: enterprise tier stays at $25k. Renewal discount remains 10% for two-year commitments."
+    }
+  ]
+}
