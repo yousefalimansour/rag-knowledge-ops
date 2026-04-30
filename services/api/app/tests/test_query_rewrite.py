@@ -38,15 +38,18 @@ def test_parse_array_returns_empty_on_garbage():
 
 
 def test_rewrite_query_falls_back_when_llm_errors(monkeypatch):
-    """No LLM stub → embed_one would fail with no GOOGLE_API_KEY → rewrite
-    must return the original question, not raise."""
-    from app.ai import llm
+    """When the LLM raises, rewrite must return only the original question
+    rather than letting the exception bubble up."""
     from app.core.errors import LLMError
+    from app.retrieval import query_rewrite as qr
 
     def boom(*_a, **_k):
         raise LLMError("no key")
 
-    monkeypatch.setattr(llm, "generate_text", boom)
+    # Patch the rebinding inside `query_rewrite` (it does
+    # `from app.ai.llm import generate_text`, so patching `llm.generate_text`
+    # alone wouldn't reach the call site).
+    monkeypatch.setattr(qr, "generate_text", boom)
     out = rewrite_query("How do new employees onboard their first week?")
     assert out == ["How do new employees onboard their first week?"]
 

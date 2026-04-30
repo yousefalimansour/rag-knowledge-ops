@@ -13,8 +13,10 @@ def test_safe_dump_redacts_secret_fields():
     assert dumped["SECRET_KEY"] == "***"
     assert dumped["JWT_SECRET"] == "***"
     assert dumped["GOOGLE_API_KEY"] == "***"
-    # Non-secret fields stay intact.
-    assert dumped["GEMINI_MODEL"] == "gemini-2.5-flash"
+    # Non-secret fields stay intact and equal the model's actual value
+    # (env-driven, so don't hardcode a specific Gemini model name here).
+    assert dumped["GEMINI_MODEL"] == s.GEMINI_MODEL
+    assert "***" not in dumped["GEMINI_MODEL"]
 
 
 def test_repr_does_not_expose_secret_values():

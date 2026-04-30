@@ -8,16 +8,20 @@ test('signup → dashboard → logout → login redirect', async ({ page }) => {
   await page.goto('/dashboard');
   await page.waitForURL(/\/login/);
 
-  // Sign up.
+  // Sign up. The auth form uses placeholders rather than <label>s — the
+  // login card is a verbatim Uiverse port and intentionally label-less.
   await page.goto('/signup');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: /create account/i }).click();
+  await page.getByPlaceholder('Email').fill(email);
+  await page.getByPlaceholder(/Password/).fill(password);
+  await page.getByRole('button', { name: /sign up/i }).click();
 
   await page.waitForURL(/\/dashboard/);
   await expect(page.getByText(email)).toBeVisible();
 
-  // Sign out.
-  await page.getByRole('button', { name: /sign out/i }).click();
+  // Sign out. The "Sign out" action lives inside a Radix DropdownMenu
+  // attached to the user avatar in the topbar — open it first. The email
+  // contains a `+` which is regex-special, so filter by visible text.
+  await page.getByRole('button').filter({ hasText: email }).click();
+  await page.getByRole('menuitem', { name: /sign out/i }).click();
   await page.waitForURL(/\/login/);
 });

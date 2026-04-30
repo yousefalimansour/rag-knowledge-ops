@@ -68,21 +68,27 @@ working state, intentionally informal.
 - **Live validation passed**: 2 conflicting policy docs → conflict insight + high-severity notification visible within ~8 seconds. Gemini correctly identified the 1.5/10 vs 2.5/30 contradiction.
 
 **Step 07 — Testing, Evaluation & Quality** ✅
-- Added `test_rate_limit.py` with 7 tests (window math, capacity 429 + Retry-After, key isolation, window rotation, IP-resolver branches). Backend now 92 passing.
-- Eval harness lives at `eval/retrieval/`: 5 corpus fixtures (pricing-v1+v2 with designed conflict, product-decisions, security-handbook, support-logs.json, onboarding.notion.json) + 15 Q&A in `questions.yaml`.
-- Eval `conftest.py` ingests the corpus once per session into a fresh workspace via `services.ingest.ingest_document` (synchronous — bypasses Celery), then cleans up Chroma + workspace on teardown.
-- Test parametrizes over questions, scores each per-question (recall@5, MRR rank), and prints a metric table. Frugal: skips rewrite+rerank, budgets 3 in-corpus + 3 must-refuse LLM probes per run for phrase + refusal validation.
-- **Live validation passed**: recall@5=1.0, MRR=0.917 (well above 0.80/0.60 thresholds). Phrase + refusal probes degrade gracefully on quota errors.
-- Frontend tests: added `lib/highlight.test.tsx`, `lib/filters.test.ts`, `components/app/answer-renderer.test.tsx`. 13 frontend vitest passing (was 2).
-- Added Playwright `copilot.spec.ts`: signup → upload → poll ready → ask → assert citation. Skipped when stack/Gemini unavailable.
-- Make targets: `test`, `test-api`, `test-web`, `eval`, `e2e`, `lint`, `lint-api`, `lint-web`, `typecheck`, `fmt`. `eval` propagates `GOOGLE_API_KEY` to the api container.
+- Added `test_rate_limit.py` (7 tests) and `test_insights_stale.py` (2 tests). **Backend now 94 pytest + 75.0% coverage.**
+- Eval harness at `eval/retrieval/`: 5 corpus fixtures (pricing-v1+v2 with designed conflict, product-decisions, security-handbook, support-logs.json, onboarding.notion.json) + 15 Q&A in `questions.yaml`. Frugal-by-default (skips rewrite+rerank for retrieval-only questions, budgets 3 in-corpus + 3 must-refuse LLM probes).
+- **Eval result with `gemini-3.1-flash-lite-preview`: recall@5=1.0, MRR=0.917, expected_phrase_rate=1.0, correct_refusal_rate=1.0** — all four thresholds asserted and met.
+- Frontend tests: added `lib/highlight.test.tsx`, `lib/filters.test.ts`, `components/app/answer-renderer.test.tsx`. **13 frontend vitest passing (was 2).**
+- Playwright e2e: 2 specs both green — `auth.spec.ts` (signup → dashboard → dropdown → sign out) and `copilot.spec.ts` (signup → upload → poll ready → ask → assert citation/grounded text + confidence pill). Copilot retries 5× on Gemini transient 503s with backoff, skips gracefully on sustained outage.
+- Coverage wired: `make coverage` runs `pytest --cov` with `--cov-fail-under=70` against the `[tool.coverage.run|report]` config in `pyproject.toml`. Targeted modules where unit tests can reach the code (security, rate_limit, confidence, fusion, dedup, citations) are 93–100%; integration-only paths (vector.py, keyword.py postgres branch, pdf extractor) are exercised through the eval harness instead.
+- Make targets: `test`, `test-api`, `test-web`, `eval`, `e2e`, `coverage`, `lint`, `lint-api`, `lint-web`, `typecheck`, `fmt`. `eval` propagates `GOOGLE_API_KEY` to the api container.
 - `pyproject.toml` registers pytest markers (unit / integration / worker / eval). Eval has its own `pytest.ini` so it's runnable from any working dir.
 
 **Bugs caught + fixed this step**
 - `services.retrieval.retrieve` was sharing one `AsyncSession` across `asyncio.gather(vector_search, keyword_search)` — async SQLAlchemy forbids concurrent ops on one session. Serialized the calls; DB time is sub-ms next to LLM time anyway. Latent bug masked by unit tests that stub vector_search.
 - `AnswerRenderer` placeholder `__CITE__id__` was being parsed as bold by ReactMarkdown. Switched to Unicode PUA sentinels ( / ).
 - Vitest 2 doesn't auto-`cleanup()` Testing Library renders — added `vitest.setup.ts`.
+- `app/insights/stale.py` did `datetime.now(UTC) - doc.updated_at` — raised `TypeError` on SQLite test backend (loses tz info). Added `_aware()` coercion.
+- `test_query_rewrite.py` patched `llm.generate_text` but `query_rewrite` does `from app.ai.llm import generate_text`, so the patch was a no-op when `GOOGLE_API_KEY` is set. Switched to patching the rebinding inside `query_rewrite`.
+- `test_settings.py` hardcoded `GEMINI_MODEL == "gemini-2.5-flash"` — broke when the user switched to flash-lite-preview. Now compares to `s.GEMINI_MODEL` (env-driven).
 - Added `use_rerank` flag to `retrieve()` (default True) so the eval can opt out and save LLM calls.
+
+**Final test count: 94 backend + 13 frontend + 16 eval + 2 e2e = 125 tests, all green.**
+
+**Switched generation model 2026-04-30**: `gemini-2.5-flash` → `gemini-3.1-flash-lite-preview` (per user). Higher RPD, but transient 503 "experiencing high demand" is more frequent — handled with internal `google.api_core.retry` + test-side retries on the e2e.
 
 **Step 06 — System Design & Infrastructure** ✅
 - `Settings.safe_dump()` + custom `__repr__` redact `SECRET_KEY` / `JWT_SECRET` / `GOOGLE_API_KEY` / `DATABASE_URL` / `REDIS_URL`. Production fail-fast on placeholder values.
@@ -148,6 +154,4 @@ the docs reaching `ready`.
 
 **Step 08 — Final Delivery Checklist** — README polish, demo script, smoke-test runbook, the "would I ship this?" review.
 
-**Carryovers from Step 07**:
-- Playwright e2e (`apps/web/e2e/copilot.spec.ts`) authored but not green-validated; needs Gemini quota that wasn't available today.
-- Coverage instrumentation (pytest --cov on app/ingestion, app/retrieval, app/insights, app/core) deferred — not wired into make.
+No carryovers from Step 07 — every acceptance criterion is now validated end-to-end.

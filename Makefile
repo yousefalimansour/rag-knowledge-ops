@@ -1,5 +1,5 @@
 .PHONY: help up down build logs migrate seed \
-        test test-api test-web eval e2e \
+        test test-api test-web eval e2e coverage \
         lint lint-api lint-web typecheck fmt clean
 
 help: ## show this help
@@ -33,6 +33,11 @@ test-web: ## frontend unit tests (vitest)
 
 eval: ## retrieval-quality eval harness — needs GOOGLE_API_KEY
 	docker compose exec -e GOOGLE_API_KEY=$$GOOGLE_API_KEY api bash -c 'cd /srv/eval/retrieval && pytest -v'
+
+coverage: ## pytest with coverage report on the targeted modules
+	docker compose exec api pytest --cov --cov-report=term-missing \
+	  --cov-fail-under=70 \
+	  --cov-config=pyproject.toml
 
 e2e: ## frontend e2e (playwright) — needs the stack up
 	cd apps/web && pnpm test:e2e

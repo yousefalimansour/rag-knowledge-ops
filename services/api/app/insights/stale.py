@@ -27,6 +27,12 @@ log = logging.getLogger("api.insights.stale")
 STALENESS_DAYS = 90
 
 
+def _aware(dt: datetime) -> datetime:
+    """SQLite roundtrips drop tz info; coerce back to UTC-aware so arithmetic
+    against `datetime.now(UTC)` doesn't raise."""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
 async def scan_stale_documents(
     *, session: AsyncSession, run: InsightRun, workspace_id: UUID
 ) -> int:
@@ -53,7 +59,7 @@ async def scan_stale_documents(
             continue
 
         title = f"Stale document: {doc.title}"
-        days_old = (datetime.now(UTC) - doc.updated_at).days
+        days_old = (datetime.now(UTC) - _aware(doc.updated_at)).days
         summary = (
             f"{doc.title} hasn't been updated in {days_old} days. "
             "If it's still relied on, consider reviewing it."

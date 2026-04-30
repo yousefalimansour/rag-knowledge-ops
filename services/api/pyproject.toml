@@ -62,6 +62,34 @@ markers = [
     "eval: retrieval-quality harness; needs GOOGLE_API_KEY + Chroma + Postgres",
 ]
 
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "app/tests/*",
+    "app/scripts/*",
+    "app/main.py",
+    "app/db/session.py",
+    "app/core/logging.py",
+    "app/core/middleware.py",
+    "app/core/publisher.py",
+    "app/api/*",
+    "app/notifications/dispatcher.py",
+    "app/insights/coordinator.py",
+    "app/insights/nightly.py",
+]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "\\.\\.\\.",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*"]
