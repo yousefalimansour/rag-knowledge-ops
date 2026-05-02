@@ -28,6 +28,7 @@ Walk it in order. Anything unchecked is a release-blocker. If something is inten
 - [x] `.env.example` complete with one comment per variable (rewritten in step 06).
 - [x] `.claude/CLAUDE.md` up to date and accurate.
 - [x] All `steps/0X-*.md` files reflect what was actually built (each step's acceptance section lists deviations + caught bugs).
+- [x] `ARCHITECTURE.md` at repo root — system topology, data flow for the four critical paths, storage layout, concurrency / SSE lifecycle, scaling matrix, explicit trade-offs, threat model. Referenced from the README's roadmap section. Submission spec's "Strong Bonus" item.
 
 ## 2. Backend Endpoints
 

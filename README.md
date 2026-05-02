@@ -497,6 +497,8 @@ Implementation is broken into nine phase plans under [`steps/`](steps/). Each is
 
 > **Current state:** all nine phases shipped. The system is a working end-to-end product — `docker compose up && make seed && open http://localhost:7000` puts you in front of the demo. See [`.claude/CLAUDE.md`](.claude/CLAUDE.md) for the durable architecture document used by every Claude Code session in this repo.
 
+> **Architecture deep-dive.** Looking for system design / data flow / scaling / threat model / explicit trade-offs? Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) — this README is the "what + how to run", that file is the "how it's organized and why".
+
 ### Known gaps & tradeoffs
 
 Documented in detail in [`steps/08-final-delivery-checklist.md` § 13](steps/08-final-delivery-checklist.md#13-known-gaps--tradeoffs). Headlines:

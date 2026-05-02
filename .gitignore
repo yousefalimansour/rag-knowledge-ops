@@ -41,11 +41,11 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-claude code working state (CLAUDE.md is the durable doc and stays tracked).
-Pattern uses /* (not /) so the negation below can re-include CLAUDE.md —
-git can't re-include a file once its parent directory is excluded.
-.claude/*
-!.claude/CLAUDE.md
+# claude code working state (CLAUDE.md is the durable doc and stays tracked).
+# Pattern uses /* (not /) so the negation below can re-include CLAUDE.md —
+# git can't re-include a file once its parent directory is excluded.
+# .claude/*
+# !.claude/CLAUDE.md
 
 # project artifacts
 /uploads/
