@@ -146,8 +146,8 @@ flowchart LR
 | **Database**     | PostgreSQL 16                                   | + `tsvector` GIN index for keyword search         |
 | **Vector store** | Chroma                                          | Local-first, persistent, simple ops               |
 | **Queue**        | Redis 7 + Celery 5 + Celery Beat                | Mature; on-demand + scheduled jobs                |
-| **LLM**          | Google AI Studio — `gemini-2.5-pro`             | Strong reasoning, native streaming                |
-| **Embeddings**   | `text-embedding-004` (768 dim)                  | Matches Chroma collection dim                     |
+| **LLM**          | Google AI Studio — `gemini-3.1-flash-lite-preview` | Higher RPD on free tier; switched from 2.5 Pro / 2.5 Flash to clear rate limits |
+| **Embeddings**   | `gemini-embedding-001` truncated to 768d via `output_dimensionality` | Matryoshka truncation keeps the Chroma collection dim consistent |
 | **Streaming**    | Server-Sent Events                              | Simpler than WS for one-way streams               |
 | **Tests**        | pytest · httpx · Playwright · custom RAG eval   | Unit · integration · worker · E2E · quality       |
 | **Infra**        | Docker Compose                                  | One command to run the whole stack                |
@@ -408,9 +408,9 @@ erDiagram
 | GET    | `/api/search`                     | Hybrid search results (no LLM)            |
 | POST   | `/api/ai/query`                   | RAG answer (sync, JSON)                   |
 | POST   | `/api/ai/query/stream`            | **SSE** — streamed answer + sources       |
-| GET    | `/api/ai/insights`                | List insights (filters)                   |
-| GET    | `/api/ai/insights/:id`            | Insight detail + linked docs              |
-| PATCH  | `/api/ai/insights/:id`            | Mark read / dismissed                     |
+| GET    | `/api/insights`                   | List insights (filters)                   |
+| GET    | `/api/insights/:id`               | Insight detail + linked docs              |
+| PATCH  | `/api/insights/:id`               | Mark read / dismissed                     |
 | POST   | `/api/insights/run`               | Trigger manual insight generation         |
 | GET    | `/api/insights/runs`              | Run history                               |
 | GET    | `/api/notifications`              | List + unread count                       |
@@ -450,23 +450,32 @@ rag-knowledge-ops/
 ## 🧪 Testing & Evaluation
 
 ```bash
-make test        # backend (pytest) + frontend (vitest)
-make test-api    # backend only
-make test-web    # frontend unit (vitest); use `pnpm --filter @kops/web test:e2e` for Playwright
-make test-eval   # RAG retrieval-quality on ~15 Q&A pairs (lands in step 07)
-make lint        # ruff + eslint
+make test        # backend pytest + frontend vitest
+make test-api    # backend only (94 tests, ~17s)
+make test-web    # frontend vitest (13 tests)
+make eval        # RAG retrieval-quality on 15 Q&A pairs — needs GOOGLE_API_KEY
+make e2e         # Playwright happy path (auth + signup→upload→ask→cite)
+make coverage    # pytest --cov, --cov-fail-under=70
+make lint        # ruff + ruff format --check + eslint + prettier --check + tsc --noEmit
+make typecheck   # mypy on app/core, app/retrieval, app/insights
 ```
 
-The **retrieval evaluation harness** lives at [`eval/retrieval/`](eval/retrieval) — a focused fixture corpus (including a *designed* conflict pair), a `questions.yaml` of ~15 Q&A pairs with expected source documents and required-refusal cases, and metrics:
+**Current state:** 94 backend pytest + 13 frontend vitest + 16 eval + 2 Playwright e2e = **125 tests, all green**. Backend coverage **75 %** overall, with the testable modules (`core/security`, `core/rate_limit`, `retrieval/confidence`, `retrieval/fusion`, `insights/dedup`, `services/citations`) at 93–100 %.
 
-| Metric                          | Target |
-|---------------------------------|--------|
-| `recall@5`                      | ≥ 0.80 |
-| `mrr`                           | ≥ 0.60 |
-| `correct_refusal_rate`          | ≥ 0.90 |
-| `expected_phrase_rate`          | ≥ 0.80 |
+The **retrieval evaluation harness** lives at [`eval/retrieval/`](eval/retrieval) — a focused fixture corpus (including a *designed* conflict pair), a `questions.yaml` of 15 Q&A pairs with expected source documents and required-refusal cases, and metrics:
 
-The harness prints a per-question report on every run — not just pass/fail — so regressions are diagnosable without re-running.
+| Metric                          | Target | Latest run |
+|---------------------------------|--------|------------|
+| `recall@5`                      | ≥ 0.80 | **1.000** |
+| `mrr`                           | ≥ 0.60 | **0.917** |
+| `correct_refusal_rate`          | ≥ 0.90 | **1.000** |
+| `expected_phrase_rate`          | ≥ 0.80 | **1.000** |
+
+The harness:
+- Ingests its corpus through the real pipeline (Postgres + Chroma + Gemini embeddings) once per session, then queries each question.
+- Skips the LLM rewriter and reranker on the per-question path — saves ~30 generation calls — and budgets a small subset of `answer_question` calls for end-to-end phrase + refusal validation.
+- Degrades gracefully on Gemini quota / 503: marks LLM-dependent metrics as "not measured" rather than failing.
+- Prints a per-question table on every run so regressions are diagnosable without re-running.
 
 ---
 
@@ -476,17 +485,25 @@ Implementation is broken into nine phase plans under [`steps/`](steps/). Each is
 
 | # | Phase                                | Plan                                                                  | Status     |
 |---|--------------------------------------|-----------------------------------------------------------------------|------------|
-| 0 | Project understanding                | [00-project-understanding.md](steps/00-project-understanding.md)             | ✅ planned |
-| 1 | Architecture & setup                 | [01-architecture-and-setup.md](steps/01-architecture-and-setup.md)             | ✅ planned |
-| 2 | Multi-source ingestion               | [02-ingestion-pipeline.md](steps/02-ingestion-pipeline.md)                 | ✅ planned |
-| 3 | Retrieval & reasoning engine         | [03-retrieval-and-reasoning-engine.md](steps/03-retrieval-and-reasoning-engine.md)   | ✅ planned |
-| 4 | AI Copilot frontend                  | [04-ai-copilot-frontend.md](steps/04-ai-copilot-frontend.md)               | ✅ planned |
-| 5 | Proactive intelligence layer         | [05-proactive-intelligence-layer.md](steps/05-proactive-intelligence-layer.md)     | ✅ planned |
-| 6 | System design & infrastructure       | [06-system-design-infrastructure.md](steps/06-system-design-infrastructure.md)     | ✅ planned |
-| 7 | Testing, evaluation & quality        | [07-testing-evaluation-and-quality.md](steps/07-testing-evaluation-and-quality.md)   | ✅ planned |
-| 8 | Final delivery checklist             | [08-final-delivery-checklist.md](steps/08-final-delivery-checklist.md)         | ✅ planned |
+| 0 | Project understanding                | [00-project-understanding.md](steps/00-project-understanding.md)             | ✅ done |
+| 1 | Architecture & setup                 | [01-architecture-and-setup.md](steps/01-architecture-and-setup.md)             | ✅ done |
+| 2 | Multi-source ingestion               | [02-ingestion-pipeline.md](steps/02-ingestion-pipeline.md)                 | ✅ done |
+| 3 | Retrieval & reasoning engine         | [03-retrieval-and-reasoning-engine.md](steps/03-retrieval-and-reasoning-engine.md)   | ✅ done |
+| 4 | AI Copilot frontend                  | [04-ai-copilot-frontend.md](steps/04-ai-copilot-frontend.md)               | ✅ done |
+| 5 | Proactive intelligence layer         | [05-proactive-intelligence-layer.md](steps/05-proactive-intelligence-layer.md)     | ✅ done |
+| 6 | System design & infrastructure       | [06-system-design-infrastructure.md](steps/06-system-design-infrastructure.md)     | ✅ done |
+| 7 | Testing, evaluation & quality        | [07-testing-evaluation-and-quality.md](steps/07-testing-evaluation-and-quality.md)   | ✅ done |
+| 8 | Final delivery checklist             | [08-final-delivery-checklist.md](steps/08-final-delivery-checklist.md)         | ✅ done |
 
-> **Current state:** detailed plans + architecture context are committed. Implementation begins from Step 01 next. See [`.claude/claude.md`](.claude/claude.md) for the durable architecture document used by every Claude Code session in this repo.
+> **Current state:** all nine phases shipped. The system is a working end-to-end product — `docker compose up && make seed && open http://localhost:7000` puts you in front of the demo. See [`.claude/CLAUDE.md`](.claude/CLAUDE.md) for the durable architecture document used by every Claude Code session in this repo.
+
+### Known gaps & tradeoffs
+
+Documented in detail in [`steps/08-final-delivery-checklist.md` § 13](steps/08-final-delivery-checklist.md#13-known-gaps--tradeoffs). Headlines:
+
+- **3 of 6 insight types ship** (conflict, repeated_decision, stale_document); the other three need a query log + larger corpus that the demo doesn't have.
+- **Notifications use polling, not SSE** for the bell badge — infrastructure exists, just not wired.
+- **Lighthouse a11y not formally audited.** Component-level a11y is in place; score not measured.
 
 ---
 

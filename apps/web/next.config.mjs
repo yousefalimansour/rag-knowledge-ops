@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Hide the dev-mode "Static route / N" indicator that floats above the UI.
+  devIndicators: {
+    appIsrStatus: false,
+    buildActivity: false,
+  },
   // Same-origin proxy: browser hits /api/* → next forwards to FastAPI.
   // Lets us share cookies and dodge CORS pre-flight in the browser.
   async rewrites() {

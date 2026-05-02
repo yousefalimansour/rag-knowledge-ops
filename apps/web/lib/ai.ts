@@ -57,8 +57,11 @@ export const aiApi = {
     api<SearchEnvelope>(`/api/search?q=${encodeURIComponent(q)}&top_k=${top_k}`),
 };
 
+export type StagePhase = 'retrieving' | 'reasoning';
+
 export type StreamEvent =
   | { event: 'start'; data: { question: string } }
+  | { event: 'stage'; data: { phase: StagePhase } }
   | { event: 'token'; data: { delta: string } }
   | { event: 'sources'; data: { sources: Source[] } }
   | { event: 'confidence'; data: { confidence: number; reasoning: string; breakdown: ConfidenceBreakdown } }

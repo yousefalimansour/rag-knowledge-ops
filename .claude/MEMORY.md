@@ -67,6 +67,20 @@ working state, intentionally informal.
 - Tests: 13 new (dedup hash stability, repo persistence, API filtering + state transitions, manual-run queueing, notification list/mark-read/mark-all-read).
 - **Live validation passed**: 2 conflicting policy docs → conflict insight + high-severity notification visible within ~8 seconds. Gemini correctly identified the 1.5/10 vs 2.5/30 contradiction.
 
+**Step 08 — Final Delivery Checklist** ✅
+- Walked all 13 sections of [steps/08-final-delivery-checklist.md](../steps/08-final-delivery-checklist.md), checked every item against the codebase, marked done where shipped + listed deferred items in §13.
+- README.md updated: model row now reads `gemini-3.1-flash-lite-preview` + truncated `gemini-embedding-001`; Testing & Evaluation section shows latest eval metrics (recall@5=1.0, mrr=0.917, phrase=1.0, refusal=1.0) and the new make targets (`make eval`, `make e2e`, `make coverage`); Roadmap status flipped from "✅ planned" to "✅ done"; API endpoint list corrected (`/api/insights` not `/api/ai/insights`); added "Known gaps & tradeoffs" pointer to Step 08 §13.
+- Documented gaps: 3-of-6 insight types ship (frequent_issue / emerging_theme / missing_context deferred — need query log + larger corpus); notifications use polling not SSE; Lighthouse a11y not formally audited.
+- **125 tests green** (94 backend pytest + 13 frontend vitest + 16 retrieval eval + 2 Playwright e2e). Backend coverage 75 % overall, security-critical modules 93–100 %.
+
+**Perf + UX polish (during step 08 audit)** ✅
+- **Chat-response latency**: SSE generator now emits `start` and `stage(retrieving)` IMMEDIATELY before retrieval, then `stage(reasoning)` before the LLM call. Frontend shows "Searching your knowledge base…" / "Reasoning over sources…" labels in the candle loader instead of a frozen "Thinking…". Vector + keyword searches run in TRUE parallel via `asyncio.gather` with per-call `SessionLocal()` (async SQLAlchemy forbids concurrent ops on one session). Rerank is now skipped when fused list ≤ top_k. Default candidate_pool dropped from 20 → 12 to shrink the rerank prompt.
+- **SSE buffering bugs caught and fixed (this was the actual root cause of slowness):**
+  - `BaseHTTPMiddleware`-style `RequestContextMiddleware` + `CSRFMiddleware` were buffering streaming response bodies (known Starlette quirk). Rewrote both as pure ASGI middleware in [services/api/app/core/middleware.py](../services/api/app/core/middleware.py) — `send` is forwarded unchanged so the upstream stream is never consumed.
+  - Next.js dev rewrite proxy ECONNRESETs long-lived SSE streams. Added a Route Handler at [apps/web/app/api/ai/query/stream/route.ts](../apps/web/app/api/ai/query/stream/route.ts) that does `fetch → pipe upstream.body → TransformStream → return new Response(readable)` so chunks flush per-event instead of being buffered for the whole response.
+- Sidebar logo bumped to `h-24 w-full object-contain`. Insights nav + page header + empty state all use `/insight.png` (with Tailwind `invert` filter against the dark surface). Next.js dev "Static route" indicator hidden via `devIndicators: { appIsrStatus: false, buildActivity: false }`.
+- ThinkingCandles is now a horizontal pill: candles scaled to 55 % via a `.scale` wrapper, "Thinking…" / stage label sits inline to the right via `inline-flex items-center gap-3`.
+
 **Step 07 — Testing, Evaluation & Quality** ✅
 - Added `test_rate_limit.py` (7 tests) and `test_insights_stale.py` (2 tests). **Backend now 94 pytest + 75.0% coverage.**
 - Eval harness at `eval/retrieval/`: 5 corpus fixtures (pricing-v1+v2 with designed conflict, product-decisions, security-handbook, support-logs.json, onboarding.notion.json) + 15 Q&A in `questions.yaml`. Frugal-by-default (skips rewrite+rerank for retrieval-only questions, budgets 3 in-corpus + 3 must-refuse LLM probes).
@@ -152,6 +166,10 @@ the docs reaching `ready`.
 
 ## Next up
 
-**Step 08 — Final Delivery Checklist** — README polish, demo script, smoke-test runbook, the "would I ship this?" review.
+All nine phases shipped. Project is done.
 
-No carryovers from Step 07 — every acceptance criterion is now validated end-to-end.
+**Open follow-ups** (documented in [steps/08-final-delivery-checklist.md § 13](../steps/08-final-delivery-checklist.md#13-known-gaps--tradeoffs) — none are blocking):
+- 3 of 6 insight types deferred (`frequent_issue`, `emerging_theme`, `missing_context`)
+- Notifications bell uses polling not SSE
+- Lighthouse a11y not formally audited
+- Coverage gap on integration-only paths in `vector.py` / `keyword.py`

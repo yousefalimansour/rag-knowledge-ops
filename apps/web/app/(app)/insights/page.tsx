@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Calendar, Check, RefreshCw, Sparkles, X } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -67,7 +68,14 @@ export default function InsightsPage() {
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-accent" /> Insights
+            <Image
+              src="/insight.png"
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7 object-contain invert"
+            />
+            Insights
           </h1>
           <p className="mt-1 text-sm text-ink-muted">
             Proactive findings from scheduled scans of your knowledge base.
@@ -122,7 +130,13 @@ export default function InsightsPage() {
 
       {!list.isLoading && items.length === 0 && (
         <div className="rounded-xl border border-dashed border-ink-faint bg-surface-700/40 p-8 text-center text-sm text-ink-muted">
-          <Sparkles className="mx-auto h-5 w-5 text-accent" />
+          <Image
+            src="/insight.png"
+            alt=""
+            width={32}
+            height={32}
+            className="mx-auto h-8 w-8 object-contain invert opacity-80"
+          />
           <p className="mt-2">
             No {stateFilter} insights yet. Upload conflicting docs or click <em>Run analysis</em> to scan now.
           </p>

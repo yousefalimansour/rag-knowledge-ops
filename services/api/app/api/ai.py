@@ -104,45 +104,74 @@ async def query_stream(
     workspace: Workspace = Depends(current_workspace),
     session: AsyncSession = Depends(db_session),
 ):
-    """Retrieval finishes (with FastAPI's request-scoped session) BEFORE we
-    construct the StreamingResponse. The token-only generator does no DB
-    work, so its lifecycle can't tangle with SQLAlchemy state.
+    """SSE-stream the answer for the user's question.
+
+    Architecture: the generator emits a `start` event IMMEDIATELY, then a
+    `stage` event before each phase (retrieving / reasoning), so the UI
+    can show progress instead of a frozen "Thinking…" spinner for 30+
+    seconds while retrieval runs. Retrieval opens its own DB sessions
+    (via `SessionLocal`) so it doesn't depend on the FastAPI-managed
+    request session — that one closes when this handler returns, but the
+    generator may run for another minute streaming tokens.
     """
-    from app.services.retrieval import retrieve
-
     await _query_limiter().hit(client_ip(request))
-
-    candidates, debug = await retrieve(
-        session=session,
-        workspace_id=workspace.id,
-        question=payload.question,
-        filters=_to_filters(payload),
-        use_query_rewrite=payload.use_query_rewrite,
-        top_k=payload.top_k,
-    )
+    _ = session  # session intentionally unused — the generator owns its own.
 
     return StreamingResponse(
-        _sse_event_loop(request, candidates=candidates, debug=debug, question=payload.question),
+        _sse_event_loop(request, payload=payload, workspace_id=workspace.id),
         media_type="text/event-stream",
-        headers={"cache-control": "no-cache", "x-accel-buffering": "no"},
+        headers={
+            "cache-control": "no-cache, no-transform",
+            "x-accel-buffering": "no",
+            "connection": "keep-alive",
+        },
     )
 
 
-async def _sse_event_loop(request: Request, *, candidates, debug: dict, question: str):
-    """Pure-streaming generator: takes pre-retrieved candidates, drives Gemini,
-    emits SSE events. No database work happens here.
+async def _sse_event_loop(request: Request, *, payload: QueryIn, workspace_id):
+    """SSE generator. Emits in order:
+    start → stage(retrieving) → stage(reasoning) → token+ → sources → confidence → done.
     """
+    from app.db.session import SessionLocal
+    from app.services.retrieval import retrieve
 
     def emit(event: str, data: dict) -> str:
         return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
 
     try:
+        # Emit `start` IMMEDIATELY so the browser knows the connection is
+        # live and the UI can flip to its "thinking" state. This single
+        # event is what users perceive as "the response started".
+        yield emit("start", {"question": payload.question})
+        yield emit("stage", {"phase": "retrieving"})
+
+        # Retrieval owns its own sessions internally for parallel DB work.
+        async with SessionLocal() as session:
+            candidates, debug = await retrieve(
+                session=session,
+                workspace_id=workspace_id,
+                question=payload.question,
+                filters=_to_filters(payload),
+                use_query_rewrite=payload.use_query_rewrite,
+                top_k=payload.top_k,
+            )
+
+        if await request.is_disconnected():
+            log.info("ai.stream.client_disconnected")
+            return
+
+        yield emit("stage", {"phase": "reasoning"})
+
         async for event, data in stream_answer(
-            candidates=candidates, debug=debug, question=question
+            candidates=candidates, debug=debug, question=payload.question
         ):
             if await request.is_disconnected():
                 log.info("ai.stream.client_disconnected")
                 return
+            # `stream_answer` already emits its own `start`; suppress the
+            # duplicate so the client doesn't reset its turn state.
+            if event == "start":
+                continue
             yield emit(event, data)
     except Exception as e:  # noqa: BLE001
         log.exception("ai.stream.failed")

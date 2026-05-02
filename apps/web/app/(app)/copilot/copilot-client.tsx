@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, MessageSquare, Send, Sparkles } from 'lucide-react';
-import { type ConfidenceBreakdown, type Source, streamQuery } from '@/lib/ai';
+import { type ConfidenceBreakdown, type Source, type StagePhase, streamQuery } from '@/lib/ai';
 import { AnswerRenderer } from '@/components/app/answer-renderer';
 import { SourcePreviewSheet } from '@/components/app/source-preview-sheet';
+import { ThinkingCandles } from '@/components/app/thinking-candles';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/toast';
 
@@ -22,6 +23,7 @@ type Turn = {
   reasoning: string;
   breakdown: ConfidenceBreakdown | null;
   phase: Phase;
+  stage: StagePhase | null;
   error: string | null;
 };
 
@@ -69,6 +71,7 @@ export function CopilotClient() {
         reasoning: '',
         breakdown: null,
         phase: 'streaming',
+        stage: null,
         error: null,
       },
     ]);
@@ -83,6 +86,9 @@ export function CopilotClient() {
     try {
       await streamQuery({ question: text }, (evt) => {
         switch (evt.event) {
+          case 'stage':
+            update({ stage: evt.data.phase });
+            break;
           case 'token':
             setTurns((cur) =>
               cur.map((t) => (t.id === id ? { ...t, answer: t.answer + evt.data.delta } : t)),
@@ -172,6 +178,17 @@ export function CopilotClient() {
   );
 }
 
+function stageLabel(stage: StagePhase | null): string {
+  switch (stage) {
+    case 'retrieving':
+      return 'Searching your knowledge base…';
+    case 'reasoning':
+      return 'Reasoning over sources…';
+    default:
+      return 'Thinking…';
+  }
+}
+
 function TurnView({
   turn,
   onCitationClick,
@@ -219,7 +236,7 @@ function TurnView({
               <AnswerRenderer text={turn.answer} sources={turn.sources} onCitationClick={onCitationClick} />
             )
           ) : turn.phase === 'streaming' ? (
-            <p className="text-ink-muted text-sm">Thinking…</p>
+            <ThinkingCandles label={stageLabel(turn.stage)} />
           ) : null}
 
           {turn.error && (
