@@ -276,16 +276,101 @@ erDiagram
     users ||--o{ notifications : addressed_to
     workspaces ||--o{ notifications : ""
 
-    users { uuid id email password_hash created_at }
-    workspaces { uuid id owner_user_id name created_at }
-    user_workspaces { uuid user_id uuid workspace_id role }
-    documents { uuid id workspace_id title source_type original_filename content_hash version status chunk_count source_metadata storage_path processed_at }
-    chunks { uuid id document_id chunk_index text text_hash heading page_number source_timestamp embedding_id content_tsv }
-    ingest_jobs { uuid id document_id workspace_id status stage error attempts started_at finished_at }
-    embedding_cache { text_hash model embedding }
-    insights { uuid id workspace_id type title summary severity confidence evidence dedup_hash state }
-    insight_runs { uuid id workspace_id scope trigger status error source_doc_ids insights_generated insights_skipped watermark_after }
-    notifications { uuid id user_id workspace_id type title body severity link_kind link_id read_at }
+    users {
+        uuid id PK
+        string email
+        string password_hash
+        timestamp created_at
+    }
+    workspaces {
+        uuid id PK
+        uuid owner_user_id FK
+        string name
+        timestamp created_at
+    }
+    user_workspaces {
+        uuid user_id FK
+        uuid workspace_id FK
+        string role
+    }
+    documents {
+        uuid id PK
+        uuid workspace_id FK
+        string title
+        string source_type
+        string original_filename
+        string content_hash
+        int version
+        string status
+        int chunk_count
+        jsonb source_metadata
+        string storage_path
+        timestamp processed_at
+    }
+    chunks {
+        uuid id PK
+        uuid document_id FK
+        int chunk_index
+        text text
+        string text_hash
+        string heading
+        int page_number
+        timestamp source_timestamp
+        string embedding_id
+        tsvector content_tsv
+    }
+    ingest_jobs {
+        uuid id PK
+        uuid document_id FK
+        uuid workspace_id FK
+        string status
+        string stage
+        string error
+        int attempts
+        timestamp started_at
+        timestamp finished_at
+    }
+    embedding_cache {
+        string text_hash PK
+        string model
+        bytea embedding
+    }
+    insights {
+        uuid id PK
+        uuid workspace_id FK
+        string type
+        string title
+        string summary
+        string severity
+        float confidence
+        jsonb evidence
+        string dedup_hash
+        string state
+    }
+    insight_runs {
+        uuid id PK
+        uuid workspace_id FK
+        string scope
+        string trigger
+        string status
+        string error
+        jsonb source_doc_ids
+        int insights_generated
+        int insights_skipped
+        timestamp watermark_after
+    }
+    notifications {
+        uuid id PK
+        uuid user_id FK
+        uuid workspace_id FK
+        string type
+        string title
+        string body
+        string severity
+        string link_kind
+        uuid link_id
+        timestamp read_at
+    }
 ```
 
 **Indexes that earn their keep.**
