@@ -1,8 +1,12 @@
 """Postgres lexical search.
 
-Uses `to_tsquery` + `ts_rank` over the `chunks.content_tsv` column (the
-`tsvector` generated in the 0002 migration). On SQLite (test env) the
-column is missing; we fall back to a simple `ILIKE` over `chunks.text`.
+Uses `plainto_tsquery` + `ts_rank` over the `chunks.content_tsv` column
+(the `tsvector` generated in the 0002 migration). `plainto_tsquery`
+accepts free text — including punctuation and non-Latin scripts —
+without raising tsquery syntax errors; tokens it can't normalize under
+the `english` config simply produce an empty query that matches no rows.
+On SQLite (test env) the column is missing; we fall back to a simple
+substring match over `chunks.text`.
 """
 
 from __future__ import annotations
@@ -11,7 +15,7 @@ import logging
 import re
 from uuid import UUID
 
-from sqlalchemy import bindparam, func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Chunk, Document
@@ -19,18 +23,7 @@ from app.retrieval.types import RetrievalCandidate, RetrievalFilters
 
 log = logging.getLogger("api.retrieval.keyword")
 
-_WORD_RE = re.compile(r"[A-Za-z0-9_]+")
-
-
-def _to_tsquery(question: str) -> str:
-    """Build a Postgres tsquery from the user's question.
-
-    Uses OR over the surviving terms after stop-style filtering — for a
-    short demo corpus that's lenient enough to find matches without being
-    too noisy. Two-character words are dropped to reduce match noise.
-    """
-    words = [w for w in _WORD_RE.findall(question.lower()) if len(w) > 2]
-    return " | ".join(words) if words else question
+_WORD_RE = re.compile(r"\w+", re.UNICODE)
 
 
 async def keyword_search(
@@ -61,17 +54,16 @@ async def _postgres_search(
     top_k: int,
     filters: RetrievalFilters,
 ) -> list[RetrievalCandidate]:
-    tsq = _to_tsquery(query)
     sql_parts = [
         "SELECT c.id, c.text, c.heading, c.page_number, c.chunk_index, c.source_timestamp,",
         "       d.id AS document_id, d.title, d.source_type,",
         "       ts_rank(c.content_tsv, q) AS rank",
         "FROM chunks c",
         "JOIN documents d ON d.id = c.document_id,",
-        "     to_tsquery('english', :tsq) q",
+        "     plainto_tsquery('english', :tsq) q",
         "WHERE d.workspace_id = :wid AND c.content_tsv @@ q",
     ]
-    params: dict[str, object] = {"tsq": tsq, "wid": str(workspace_id)}
+    params: dict[str, object] = {"tsq": query, "wid": str(workspace_id)}
 
     if filters.source_types:
         sql_parts.append("  AND d.source_type = ANY(:srcs)")
@@ -104,7 +96,7 @@ async def _postgres_search(
                 source_timestamp=r.source_timestamp,
             )
         )
-    log.info("retrieval.keyword.done", extra={"hits": len(out), "tsq": tsq})
+    log.info("retrieval.keyword.done", extra={"hits": len(out)})
     return out
 
 
